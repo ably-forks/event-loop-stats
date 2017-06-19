@@ -36,8 +36,8 @@ describe('eventLoopStats', function() {
         var stats = eventLoopStats.sense();
         expect(stats.max).to.be.gt(450);
         done();
-      }, 0);
-    }, 0)
+      }, 20);
+    }, 20)
   });
 
 });

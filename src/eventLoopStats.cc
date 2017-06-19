@@ -1,4 +1,5 @@
 #include <nan.h>
+#include <iostream>
 
 using namespace v8;
 
@@ -6,16 +7,22 @@ const uint32_t maxPossibleNumber = 4294967295;
 const uint32_t minPossibleNumber = 0;
 
 uv_check_t check_handle;
+uv_prepare_t prepare_handle;
 uint32_t min;
 uint32_t max;
 uint32_t num;
 uint32_t sum;
+
+uint32_t last_check;
+uint32_t last_prepare;
 
 void reset() {
   min = maxPossibleNumber;
   max = minPossibleNumber;
   num = 0;
   sum = 0;
+  last_check = maxPossibleNumber;
+  last_prepare = maxPossibleNumber;
 }
 
 // See the following documentation for reference of what 'check'
@@ -33,6 +40,28 @@ void on_check(uv_check_t* handle) {
     duration = now - start_time;
   }
 
+  uint64_t since_last_check;
+  if (last_check >= now) {
+    since_last_check = 0;
+  } else {
+    since_last_check = now - last_check;
+  }
+
+  uint64_t since_last_prepare;
+  if (last_prepare >= now) {
+    since_last_prepare = 0;
+  } else {
+    since_last_prepare = now - last_prepare;
+  }
+
+  last_check = now;
+
+  if(since_last_check > 100 || since_last_prepare > 100) {
+    printf("since_last_check: %lu, since_last_prepare: %lu, since uv_now: %lu \n\n", since_last_check, since_last_prepare, duration);
+  }
+
+  //printf(".");
+
   num += 1;
   sum += duration;
   if (duration < min) {
@@ -43,6 +72,29 @@ void on_check(uv_check_t* handle) {
   }
 }
 
+void on_prepare(uv_prepare_t* handle) {
+  const uint64_t now = uv_hrtime() / static_cast<uint64_t>(1e6);
+  //printf(",");
+  uint64_t since_last_check;
+  if (last_check >= now) {
+    since_last_check = 0;
+  } else {
+    since_last_check = now - last_check;
+  }
+
+  uint64_t since_last_prepare;
+  if (last_prepare >= now) {
+    since_last_prepare = 0;
+  } else {
+    since_last_prepare = now - last_prepare;
+  }
+
+  last_prepare = now;
+
+  if(since_last_check > 100 || since_last_prepare > 100) {
+    printf("since_last_check: %lu, since_last_prepare: %lu \n\n", since_last_check, since_last_prepare);
+  }
+}
 
 static NAN_METHOD(sense) {
   // reset min and max counters when there were no calls.
@@ -85,6 +137,10 @@ NAN_MODULE_INIT(init) {
   uv_check_init(uv_default_loop(), &check_handle);
   uv_check_start(&check_handle, reinterpret_cast<uv_check_cb>(on_check));
   uv_unref(reinterpret_cast<uv_handle_t*>(&check_handle));
+
+  uv_prepare_init(uv_default_loop(), &prepare_handle);
+  uv_prepare_start(&prepare_handle, reinterpret_cast<uv_prepare_cb>(on_prepare));
+  uv_unref(reinterpret_cast<uv_handle_t*>(&prepare_handle));
 
   Nan::Set(target,
     Nan::New("sense").ToLocalChecked(),
